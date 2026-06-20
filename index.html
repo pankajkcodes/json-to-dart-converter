@@ -15,7 +15,8 @@
         margin: auto;
       }
       input,
-      textarea {
+      textarea,
+      select {
         width: 100%;
         padding: 12px;
         margin: 10px 0;
@@ -46,20 +47,20 @@
     <div class="container">
       <h1>JSON To Dart Model Generator</h1>
 
-      <input id="className" value="Category" placeholder="Class Name" />
+      <input id="className" placeholder="Class Name" />
 
-      <textarea id="jsonInput">
-{
-  "_id":"1",
-  "catName":"Electronics",
-  "position":1,
-  "image":"abc.png",
-  "status":true,
-  "createdAt":"2025-01-01T00:00:00.000Z",
-  "updatedAt":"2025-01-01T00:00:00.000Z",
-  "__v":0
-}</textarea
-      >
+      <select id="exampleSelect" onchange="loadExample()">
+        <option value="">Select Example</option>
+        <option value="artist">Artist</option>
+        <option value="category">Category</option>
+        <option value="product">Product</option>
+        <option value="user">User</option>
+      </select>
+
+      <textarea
+        id="jsonInput"
+        placeholder="Paste your JSON here and click Generate Model"
+      ></textarea>
 
       <button onclick="generateModel()">Generate</button>
       <button onclick="copyCode()">Copy</button>
@@ -69,107 +70,121 @@
     </div>
 
     <script>
-      function getFieldName(key) {
-        if (key === "_id") return "id";
-        if (key === "__v") return "v";
-        return key;
+      function loadExample() {
+        const examples = {
+          artist: {
+            _id: "1",
+            name: "Arijit Singh",
+            role: "Singer",
+            type: "Artist",
+            profileImages: "artist.jpg",
+            createdAt: "2025-01-01T00:00:00.000Z",
+            updatedAt: "2025-01-01T00:00:00.000Z",
+            __v: 0,
+          },
+          category: {
+            _id: "1",
+            catName: "Electronics",
+            position: 1,
+            image: "image.png",
+            status: true,
+            createdAt: "2025-01-01T00:00:00.000Z",
+            updatedAt: "2025-01-01T00:00:00.000Z",
+            __v: 0,
+          },
+          product: {
+            _id: "1",
+            name: "iPhone 16",
+            price: 79999,
+            discount: 10.5,
+            stock: 100,
+            isAvailable: true,
+            createdAt: "2025-01-01T00:00:00.000Z",
+            __v: 0,
+          },
+          user: {
+            _id: "1",
+            name: "Pankaj",
+            email: "test@gmail.com",
+            mobile: "9876543210",
+            isVerified: true,
+            createdAt: "2025-01-01T00:00:00.000Z",
+            __v: 0,
+          },
+        };
+        const value = document.getElementById("exampleSelect").value;
+        if (value) {
+          jsonInput.value = JSON.stringify(examples[value], null, 2);
+          className.value = value.charAt(0).toUpperCase() + value.slice(1);
+          generateModel();
+        }
       }
 
-      function getType(value, key) {
-        let k = key.toLowerCase();
-
+      function getFieldName(k) {
+        if (k == "_id") return "id";
+        if (k == "__v") return "v";
+        return k;
+      }
+      function getType(v, k) {
+        let l = k.toLowerCase();
         if (
-          k.includes("createdat") ||
-          k.includes("updatedat") ||
-          k.includes("date")
+          l.includes("createdat") ||
+          l.includes("updatedat") ||
+          l.includes("date")
         )
           return "DateTime";
-
-        if (typeof value === "string") return "String";
-        if (typeof value === "boolean") return "bool";
-        if (typeof value === "number")
-          return Number.isInteger(value) ? "int" : "double";
-        if (Array.isArray(value)) return "List<dynamic>";
-        if (typeof value === "object" && value !== null)
-          return "Map<String, dynamic>";
+        if (typeof v === "string") return "String";
+        if (typeof v === "boolean") return "bool";
+        if (typeof v === "number")
+          return Number.isInteger(v) ? "int" : "double";
+        if (Array.isArray(v)) return "List<dynamic>";
         return "dynamic";
       }
-
-      function defaultValue(type) {
-        switch (type) {
-          case "String":
-            return "''";
-          case "int":
-            return "0";
-          case "double":
-            return "0.0";
-          case "bool":
-            return "false";
-          case "List<dynamic>":
-            return "[]";
-          case "Map<String, dynamic>":
-            return "{}";
-          default:
-            return "null";
-        }
+      function def(t) {
+        if (t == "String") return "''";
+        if (t == "int") return "0";
+        if (t == "double") return "0.0";
+        if (t == "bool") return "false";
+        if (t == "List<dynamic>") return "[]";
+        return "null";
       }
-
       function generateModel() {
         try {
-          const json = JSON.parse(document.getElementById("jsonInput").value);
-          const className =
-            document.getElementById("className").value || "Model";
-
-          let fields = "";
-          let constructor = "";
-          let fromJson = "";
-          let toJson = "";
-
-          Object.keys(json).forEach((key) => {
-            const type = getType(json[key], key);
-            const field = getFieldName(key);
-
-            fields += `  final ${type} ${field};\n`;
-            constructor += `    required this.${field},\n`;
-
-            if (type === "DateTime") {
-              fromJson += `      ${field}: DateTime.tryParse(json['${key}'] ?? '') ?? DateTime.now(),\n`;
-              toJson += `      '${key}': ${field}.toIso8601String(),\n`;
+          const json = JSON.parse(jsonInput.value);
+          const c = className.value || "Model";
+          let f = "",
+            con = "",
+            fr = "",
+            tj = "";
+          Object.keys(json).forEach((k) => {
+            let t = getType(json[k], k),
+              n = getFieldName(k);
+            f += `  final ${t} ${n};\n`;
+            con += `    required this.${n},\n`;
+            if (t === "DateTime") {
+              fr += `      ${n}: DateTime.tryParse(json['${k}'] ?? '') ?? DateTime.now(),\n`;
+              tj += `      '${k}': ${n}.toIso8601String(),\n`;
             } else {
-              fromJson += `      ${field}: json['${key}'] ?? ${defaultValue(type)},\n`;
-              toJson += `      '${key}': ${field},\n`;
+              fr += `      ${n}: json['${k}'] ?? ${def(t)},\n`;
+              tj += `      '${k}': ${n},\n`;
             }
           });
-
-          const code = `class ${className} {\n\n${fields}\n\n  ${className}({\n${constructor}  });\n\n  factory ${className}.fromJson(Map<String, dynamic> json) {\n    return ${className}(\n${fromJson}    );\n  }\n\n  Map<String, dynamic> toJson() {\n    return {\n${toJson}    };\n  }\n\n  @override\n  String toString() {\n    return toJson().toString();\n  }\n}`;
-
-          document.getElementById("result").textContent = code;
+          result.textContent = `class ${c} {\n\n${f}\n  ${c}({\n${con}  });\n\n  factory ${c}.fromJson(Map<String,dynamic> json){\n    return ${c}(\n${fr}    );\n  }\n\n  Map<String,dynamic> toJson(){\n    return {\n${tj}    };\n  }\n\n  @override\n  String toString(){\n    return toJson().toString();\n  }\n}`;
         } catch (e) {
-          document.getElementById("result").textContent = "Invalid JSON";
+          result.textContent = "Invalid JSON";
         }
       }
-
       function copyCode() {
-        navigator.clipboard.writeText(
-          document.getElementById("result").textContent,
-        );
+        navigator.clipboard.writeText(result.textContent);
         alert("Copied");
       }
-
       function downloadDart() {
-        const code = document.getElementById("result").textContent;
-        const className = (
-          document.getElementById("className").value || "model"
-        ).toLowerCase();
-
-        const blob = new Blob([code], { type: "text/plain" });
+        const blob = new Blob([result.textContent], { type: "text/plain" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = className + ".dart";
+        a.download = (className.value || "model").toLowerCase() + ".dart";
         a.click();
       }
-
-      generateModel();
     </script>
   </body>
 </html>
