@@ -1,252 +1,175 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JSON To Dart Model Generator</title>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JSON To Dart Model Generator</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f4f4f4;
+        padding: 20px;
+      }
+      .container {
+        max-width: 1200px;
+        margin: auto;
+      }
+      input,
+      textarea {
+        width: 100%;
+        padding: 12px;
+        margin: 10px 0;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+      }
+      textarea {
+        height: 300px;
+      }
+      button {
+        padding: 12px 16px;
+        margin-right: 10px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      pre {
+        background: #1e1e1e;
+        color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        overflow: auto;
+        min-height: 300px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>JSON To Dart Model Generator</h1>
 
-<style>
-body{
-    font-family: Arial, sans-serif;
-    background:#f5f5f5;
-    padding:20px;
-}
+      <input id="className" value="Category" placeholder="Class Name" />
 
-.container{
-    max-width:1200px;
-    margin:auto;
-}
-
-h1{
-    text-align:center;
-}
-
-input{
-    width:100%;
-    padding:12px;
-    margin-bottom:10px;
-    border:1px solid #ddd;
-    border-radius:6px;
-}
-
-textarea{
-    width:100%;
-    height:300px;
-    padding:12px;
-    border:1px solid #ddd;
-    border-radius:6px;
-    resize:vertical;
-}
-
-button{
-    margin-top:10px;
-    padding:12px 20px;
-    border:none;
-    background:#2196f3;
-    color:white;
-    border-radius:6px;
-    cursor:pointer;
-}
-
-button:hover{
-    background:#1976d2;
-}
-
-.output{
-    margin-top:20px;
-}
-
-pre{
-    background:#1e1e1e;
-    color:#fff;
-    padding:20px;
-    border-radius:6px;
-    overflow:auto;
-}
-</style>
-</head>
-<body>
-
-<div class="container">
-
-<h1>JSON To Dart Model Generator</h1>
-
-<input
-id="className"
-placeholder="Class Name (Example: Artist)"
-value="Artist"
-/>
-
-<textarea id="jsonInput">
+      <textarea id="jsonInput">
 {
-  "_id":"123",
-  "name":"John",
-  "role":"Singer",
-  "type":"Artist",
-  "profileImages":"image.jpg",
+  "_id":"1",
+  "catName":"Electronics",
+  "position":1,
+  "image":"abc.png",
+  "status":true,
   "createdAt":"2025-01-01T00:00:00.000Z",
   "updatedAt":"2025-01-01T00:00:00.000Z",
   "__v":0
-}
-</textarea>
+}</textarea
+      >
 
-<button onclick="generateModel()">
-Generate Dart Model
-</button>
+      <button onclick="generateModel()">Generate</button>
+      <button onclick="copyCode()">Copy</button>
+      <button onclick="downloadDart()">Download Dart</button>
 
-<div class="output">
-<pre id="result"></pre>
-</div>
+      <pre id="result"></pre>
+    </div>
 
-</div>
+    <script>
+      function getFieldName(key) {
+        if (key === "_id") return "id";
+        if (key === "__v") return "v";
+        return key;
+      }
 
-<script>
+      function getType(value, key) {
+        let k = key.toLowerCase();
 
-function getDartType(value,key){
+        if (
+          k.includes("createdat") ||
+          k.includes("updatedat") ||
+          k.includes("date")
+        )
+          return "DateTime";
 
-    if(key.toLowerCase().includes('date') ||
-       key.toLowerCase().includes('createdat') ||
-       key.toLowerCase().includes('updatedat')){
-        return 'DateTime';
-    }
+        if (typeof value === "string") return "String";
+        if (typeof value === "boolean") return "bool";
+        if (typeof value === "number")
+          return Number.isInteger(value) ? "int" : "double";
+        if (Array.isArray(value)) return "List<dynamic>";
+        if (typeof value === "object" && value !== null)
+          return "Map<String, dynamic>";
+        return "dynamic";
+      }
 
-    if(typeof value === 'string')
-        return 'String';
-
-    if(typeof value === 'number'){
-        return Number.isInteger(value)
-            ? 'int'
-            : 'double';
-    }
-
-    if(typeof value === 'boolean')
-        return 'bool';
-
-    if(Array.isArray(value))
-        return 'List<dynamic>';
-
-    if(typeof value === 'object')
-        return 'Map<String, dynamic>';
-
-    return 'dynamic';
-}
-
-function defaultValue(type){
-
-    switch(type){
-        case 'String':
+      function defaultValue(type) {
+        switch (type) {
+          case "String":
             return "''";
+          case "int":
+            return "0";
+          case "double":
+            return "0.0";
+          case "bool":
+            return "false";
+          case "List<dynamic>":
+            return "[]";
+          case "Map<String, dynamic>":
+            return "{}";
+          default:
+            return "null";
+        }
+      }
 
-        case 'int':
-            return '0';
+      function generateModel() {
+        try {
+          const json = JSON.parse(document.getElementById("jsonInput").value);
+          const className =
+            document.getElementById("className").value || "Model";
 
-        case 'double':
-            return '0.0';
+          let fields = "";
+          let constructor = "";
+          let fromJson = "";
+          let toJson = "";
 
-        case 'bool':
-            return 'false';
+          Object.keys(json).forEach((key) => {
+            const type = getType(json[key], key);
+            const field = getFieldName(key);
 
-        case 'List<dynamic>':
-            return '[]';
+            fields += `  final ${type} ${field};\n`;
+            constructor += `    required this.${field},\n`;
 
-        case 'Map<String, dynamic>':
-            return '{}';
-
-        default:
-            return 'null';
-    }
-}
-
-function generateModel(){
-
-    try{
-
-        const json = JSON.parse(
-            document.getElementById('jsonInput').value
-        );
-
-        const className =
-            document.getElementById('className').value.trim() || 'Model';
-
-        let fields = '';
-        let constructor = '';
-        let fromJson = '';
-        let toJson = '';
-
-        Object.keys(json).forEach(key => {
-
-            const type = getDartType(json[key],key);
-
-            const fieldName = key === '_id'
-                ? 'id'
-                : key.replace(/[^a-zA-Z0-9]/g,'');
-
-            fields += `  final ${type} ${fieldName};\n`;
-
-            constructor += `    required this.${fieldName},\n`;
-
-            if(type === 'DateTime'){
-
-                fromJson +=
-`      ${fieldName}: DateTime.tryParse(json['${key}'] ?? '') ?? DateTime.now(),
-`;
-
-                toJson +=
-`      '${key}': ${fieldName}.toIso8601String(),
-`;
-
-            }else{
-
-                fromJson +=
-`      ${fieldName}: json['${key}'] ?? ${defaultValue(type)},
-`;
-
-                toJson +=
-`      '${key}': ${fieldName},
-`;
-
+            if (type === "DateTime") {
+              fromJson += `      ${field}: DateTime.tryParse(json['${key}'] ?? '') ?? DateTime.now(),\n`;
+              toJson += `      '${key}': ${field}.toIso8601String(),\n`;
+            } else {
+              fromJson += `      ${field}: json['${key}'] ?? ${defaultValue(type)},\n`;
+              toJson += `      '${key}': ${field},\n`;
             }
+          });
 
-        });
+          const code = `class ${className} {\n\n${fields}\n\n  ${className}({\n${constructor}  });\n\n  factory ${className}.fromJson(Map<String, dynamic> json) {\n    return ${className}(\n${fromJson}    );\n  }\n\n  Map<String, dynamic> toJson() {\n    return {\n${toJson}    };\n  }\n\n  @override\n  String toString() {\n    return toJson().toString();\n  }\n}`;
 
-        const dartCode =
+          document.getElementById("result").textContent = code;
+        } catch (e) {
+          document.getElementById("result").textContent = "Invalid JSON";
+        }
+      }
 
-`class ${className} {
+      function copyCode() {
+        navigator.clipboard.writeText(
+          document.getElementById("result").textContent,
+        );
+        alert("Copied");
+      }
 
-${fields}
+      function downloadDart() {
+        const code = document.getElementById("result").textContent;
+        const className = (
+          document.getElementById("className").value || "model"
+        ).toLowerCase();
 
-  ${className}({
-${constructor}
-  });
+        const blob = new Blob([code], { type: "text/plain" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = className + ".dart";
+        a.click();
+      }
 
-  factory ${className}.fromJson(
-      Map<String, dynamic> json) {
-
-    return ${className}(
-
-${fromJson}
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-
-    return {
-
-${toJson}
-    };
-  }
-}
-`;
-
-        document.getElementById('result').textContent = dartCode;
-
-    }catch(e){
-
-        document.getElementById('result').textContent =
-            'Invalid JSON';
-    }
-}
-</script>
-
-</body>
+      generateModel();
+    </script>
+  </body>
 </html>
